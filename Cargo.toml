@@ -1,5 +1,3 @@
 [workspace]
 
-members = [
-    "rucord_ws",
-]
+members = ["rucord_ws", "rucord_api_types", "rucord_rest"]
