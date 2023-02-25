@@ -1,6 +1,6 @@
 #![allow(non_upper_case_globals)]
 
-use std::str::FromStr;
+use std::{env, str::FromStr};
 
 use bitflags::bitflags;
 use num_derive::FromPrimitive;
@@ -91,7 +91,7 @@ bitflags! {
     /// Represents the different events that can be received over the gateway.
     ///
     /// [Discord documentation](https://discord.com/developers/docs/topics/gateway#list-of-intents).
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize, Default, Deserialize)]
     pub struct GatewayIntentBits: u64 {
         const Guilds = 1 << 0;
         const GuildMembers = 1 << 1;
@@ -442,7 +442,7 @@ pub enum DispatchPayload {
     Unknown(String, JsonMap),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct IdentifyData {
     token: String,
 
@@ -470,6 +470,18 @@ pub struct IdentifyConnectionProperties {
     browser: String,
 
     device: String,
+}
+
+impl Default for IdentifyConnectionProperties {
+    fn default() -> Self {
+        let browser = format!("rucord {}", env!("CARGO_PKG_VERSION"));
+
+        Self {
+            os: browser.clone(),
+            browser,
+            device: env::consts::OS.into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
