@@ -460,7 +460,7 @@ pub struct IdentifyData {
     #[serde(default)]
     pub presence: Option<UpdatePresenceData>,
 
-    pub intents: GatewayIntentBits,
+    pub intents: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
