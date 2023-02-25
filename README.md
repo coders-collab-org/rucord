@@ -19,8 +19,9 @@ We also have a [code of conduct](CODE_OF_CONDUCT.md) that we expect all contribu
 ### WebSocket Manager
 - [x] Implement worker and shard creation
 - [x] Implement shard bucket creation
-- [ ] Resolve hello event and implement heartbeat interval
-- [ ] Implement identify message sending
+- [x] Resolve hello event and implement heartbeat interval
+- [x] Implement identify message sending
+- [ ] Apply identify rate limit = 5 second.
 
 ## Blazingly Fast 🚀
 
