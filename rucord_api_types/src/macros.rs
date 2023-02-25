@@ -4,6 +4,6 @@ macro_rules! to_value {
             $map.remove(stringify!($key))
                 .expect(format!("expected `{}` field", stringify!($key)).as_str()),
         )
-        .expect("Inavlid field type")
+        .expect("Invalid field type")
     };
 }
