@@ -119,7 +119,7 @@ impl WebSocketManager {
             bucket.connect().await;
         }
 
-        Ok(())
+        loop {}
     }
 
     pub async fn destroy(&self, info: Option<CloseFrame<'static>>) {
@@ -143,6 +143,7 @@ impl WebSocketManager {
             gateway_info,
             event_handler,
             token: token.clone(),
+            identify_properties: Default::default(),
             intents: intents.clone(),
         });
         self.buckets = join_all(
