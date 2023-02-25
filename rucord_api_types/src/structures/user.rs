@@ -18,7 +18,7 @@ pub struct UserObject {
     username: String,
 
     /// The user's 4-digit discord-tag.
-    discriminator: u8,
+    discriminator: String,
 
     /// the user's [avatar hash](https://discord.com/developers/docs/reference#image-formatting).
     avatar: Option<String>,
