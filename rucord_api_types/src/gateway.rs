@@ -285,7 +285,7 @@ pub enum GatewayDispatchEvents {
 pub enum GatewaySendPayload {
     Identify(IdentifyData),
     Resume(ResumeData),
-    Heartbeat(u64),
+    Heartbeat(Option<u64>),
     RequestGuildMembers(RequestGuildMembersData),
     VoiceStateUpdate(VoiceStateUpdateData),
     UpdatePresence(UpdatePresenceData),
