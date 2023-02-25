@@ -7,6 +7,7 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use serde_json::{from_value, Value};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use strum_macros::{Display, EnumString};
 
 use crate::{Snowflake, UserObject};
@@ -55,7 +56,8 @@ pub enum GatewayOpcode {
 /// Represents a Discord gateway close event code and associated error message.
 ///
 /// [Discord documentation](https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-gateway-opcodes).
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize_repr, Deserialize_repr, PartialEq, Eq)]
+#[repr(u32)]
 pub enum GatewayCloseCode {
     /// We're not sure what went wrong. Try reconnecting?
     UnknownError = 4000,
