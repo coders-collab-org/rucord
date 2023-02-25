@@ -3,6 +3,7 @@
 use bitflags::bitflags;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use strum_macros::EnumString;
 
 use crate::Snowflake;
@@ -71,7 +72,6 @@ pub struct UserObject {
 bitflags! {
     /// Represents a Discord User Flags.
     /// [Discord documentation](https://discord.com/developers/docs/resources/user#user-object-user-flags).
-    #[derive(Serialize, Deserialize)]
     pub struct UserFlags: u64 {
         /// Discord Employee.
         const Staff = 1 << 0;
@@ -80,7 +80,7 @@ bitflags! {
         const Partner = 1 << 1;
 
         /// HypeSquad Events Member.
-        const Hypesquad = 1 << 2;
+        const HypeSquad = 1 << 2;
 
         /// Bug Hunter Level 1.
         const BugHunterLevel1 = 1 << 3;
@@ -122,7 +122,8 @@ bitflags! {
 
 /// Represents a User Premium Type.
 /// [Discord documentation](https://discord.com/developers/docs/resources/user#user-object-premium-types).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
 pub enum PremiumType {
     None,
     NitroClassic,
@@ -171,6 +172,7 @@ pub struct ConnectionObject {
 
 #[derive(Debug, Clone, EnumString, Serialize, Deserialize)]
 #[strum(serialize_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
 pub enum ConnectionService {
     BattleNet,
     EBay,
@@ -193,7 +195,8 @@ pub enum ConnectionService {
     YouTube,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
 pub enum ConnectionVisibility {
     /// Invisible to everyone except the user themselves.
     None,
