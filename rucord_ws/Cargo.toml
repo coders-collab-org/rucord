@@ -20,8 +20,8 @@ serde_json = "1.0.93"
 num-derive = "0.3.3"
 num-traits = "0.2"
 kanal = "0.1.0-pre8"
-futures = "0.3.26"
-
+futures = { version = "0.3.26", default-features = false, features = ["std"] }
+rand = "0.8.5"
 
 rucord_api_types = { path = "../rucord_api_types" }
 rucord_rest = { path = "../rucord_rest" }
