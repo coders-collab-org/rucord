@@ -122,7 +122,7 @@ bitflags! {
 /// feature.
 ///
 /// [Discord documentation](https://discord.com/developers/docs/topics/gateway#commands-and-events-gateway-events).
-#[derive(Debug, Clone, Serialize, Deserialize, EnumString, Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, EnumString, Display, PartialEq, Eq)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum GatewayDispatchEvents {
     /// Emitted when the application command permissions for a guild have been updated.
@@ -323,122 +323,123 @@ pub enum DispatchPayload {
     Ready(ReadyData),
     /// Response to [Resume](https://discord.com/developers/docs/topics/gateway-events#resumed).
     Resume,
+    ApplicationCommandPermissionsUpdate(JsonMap),
 
-    ApplicationCommandPermissionsUpdate(Value),
+    AutoModerationRuleCreate(JsonMap),
 
-    AutoModerationRuleCreate(Value),
+    AutoModerationRuleUpdate(JsonMap),
 
-    AutoModerationRuleUpdate(Value),
+    AutoModerationRuleDelete(JsonMap),
 
-    AutoModerationRuleDelete(Value),
+    AutoModerationActionExecution(JsonMap),
 
-    AutoModerationActionExecution(Value),
+    ChannelCreate(JsonMap),
 
-    ChannelCreate(Value),
+    ChannelUpdate(JsonMap),
 
-    ChannelUpdate(Value),
+    ChannelDelete(JsonMap),
 
-    ChannelDelete(Value),
+    ChannelPinsUpdate(JsonMap),
 
-    ChannelPinsUpdate(Value),
+    ThreadCreate(JsonMap),
 
-    ThreadCreate(Value),
+    ThreadUpdate(JsonMap),
 
-    ThreadUpdate(Value),
+    ThreadDelete(JsonMap),
 
-    ThreadDelete(Value),
+    ThreadListSync(JsonMap),
 
-    ThreadListSync(Value),
+    ThreadMemberUpdate(JsonMap),
 
-    ThreadMemberUpdate(Value),
+    ThreadMembersUpdate(JsonMap),
 
-    ThreadMembersUpdate(Value),
+    GuildCreate(JsonMap),
 
-    GuildCreate(Value),
+    GuildUpdate(JsonMap),
 
-    GuildUpdate(Value),
+    GuildDelete(JsonMap),
 
-    GuildDelete(Value),
+    GuildAuditLogEntryCreate(JsonMap),
 
-    GuildAuditLogEntryCreate(Value),
+    GuildBanAdd(JsonMap),
 
-    GuildBanAdd(Value),
+    GuildBanRemove(JsonMap),
 
-    GuildBanRemove(Value),
+    GuildEmojisUpdate(JsonMap),
 
-    GuildEmojisUpdate(Value),
+    GuildStickersUpdate(JsonMap),
 
-    GuildStickersUpdate(Value),
+    GuildIntegrationsUpdate(JsonMap),
 
-    GuildIntegrationsUpdate(Value),
+    GuildMemberAdd(JsonMap),
 
-    GuildMemberAdd(Value),
+    GuildMemberRemove(JsonMap),
 
-    GuildMemberRemove(Value),
+    GuildMemberUpdate(JsonMap),
 
-    GuildMemberUpdate(Value),
+    GuildMembersChunk(JsonMap),
 
-    GuildMembersChunk(Value),
+    GuildRoleCreate(JsonMap),
 
-    GuildRoleCreate(Value),
+    GuildRoleUpdate(JsonMap),
 
-    GuildRoleUpdate(Value),
+    GuildRoleDelete(JsonMap),
 
-    GuildRoleDelete(Value),
+    GuildScheduledEventCreate(JsonMap),
 
-    GuildScheduledEventCreate(Value),
+    GuildScheduledEventUpdate(JsonMap),
 
-    GuildScheduledEventUpdate(Value),
+    GuildScheduledEventDelete(JsonMap),
 
-    GuildScheduledEventDelete(Value),
+    GuildScheduledEventUserAdd(JsonMap),
 
-    GuildScheduledEventUserAdd(Value),
+    GuildScheduledEventUserRemove(JsonMap),
 
-    GuildScheduledEventUserRemove(Value),
+    InteractionCreate(JsonMap),
 
-    InteractionCreate(Value),
+    IntegrationUpdate(JsonMap),
 
-    IntegrationUpdate(Value),
+    IntegrationDelete(JsonMap),
 
-    IntegrationDelete(Value),
+    InviteCreate(JsonMap),
 
-    InviteCreate(Value),
+    InviteDelete(JsonMap),
 
-    InviteDelete(Value),
+    MessageCreate(JsonMap),
 
-    MessageCreate(Value),
+    MessageUpdate(JsonMap),
 
-    MessageUpdate(Value),
+    MessageDelete(JsonMap),
 
-    MessageDelete(Value),
+    MessageDeleteBulk(JsonMap),
 
-    MessageDeleteBulk(Value),
+    MessageReactionAdd(JsonMap),
 
-    MessageReactionAdd(Value),
+    MessageReactionRemove(JsonMap),
 
-    MessageReactionRemove(Value),
+    MessageReactionRemoveAll(JsonMap),
 
-    MessageReactionRemoveAll(Value),
+    MessageReactionRemoveEmoji(JsonMap),
 
-    MessageReactionRemoveEmoji(Value),
+    PresenceUpdate(JsonMap),
 
-    PresenceUpdate(Value),
+    StageInstanceCreate(JsonMap),
 
-    StageInstanceCreate(Value),
+    StageInstanceUpdate(JsonMap),
 
-    StageInstanceUpdate(Value),
+    StageInstanceDelete(JsonMap),
 
-    StageInstanceDelete(Value),
+    TypingStart(JsonMap),
 
-    TypingStart(Value),
+    UserUpdate(JsonMap),
 
-    UserUpdate(Value),
+    VoiceStateUpdate(JsonMap),
 
-    VoiceStateUpdate(Value),
+    VoiceServerUpdate(JsonMap),
 
-    VoiceServerUpdate(Value),
+    WebhooksUpdate(JsonMap),
 
-    WebhooksUpdate(Value),
+    Unknown(String, JsonMap),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -617,11 +618,17 @@ impl GatewayReceivePayload {
 
 impl DispatchPayload {
     pub fn from_payload(mut payload: JsonMap) -> (i64, Self) {
-        let event_type = to_value!(payload, t);
+        let s = to_value!(payload, s);
+
+        let event_str: String = to_value!(payload, t);
+
+        let Ok(event) = GatewayDispatchEvents::from_str(&event_str) else {
+            return (s, Self::Unknown(event_str.into(), payload));
+        };
 
         (
-            to_value!(payload, s),
-            match event_type {
+            s,
+            match event {
                 GatewayDispatchEvents::Ready => Self::Ready(to_value!(payload, d)),
                 GatewayDispatchEvents::Resumed => Self::Resume,
 
