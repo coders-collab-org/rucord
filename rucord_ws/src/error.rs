@@ -1,5 +1,6 @@
 use async_tungstenite::tungstenite::{protocol::CloseFrame, Error as TungsteniteError};
 use rucord_rest::reqwest::Error as RegError;
+use serde_json::Error as JsonError;
 use std::{error::Error, fmt::Display};
 
 #[derive(Debug)]
@@ -7,7 +8,7 @@ pub enum WebSocketError {
     Request(RegError),
     Shard(ShardError),
     NotEnoughSessionsRemaining(u64, u64),
-    Json(serde_json::Error),
+    Json(JsonError),
 }
 
 #[derive(Debug)]
@@ -35,6 +36,12 @@ impl From<TungsteniteError> for ShardError {
     }
 }
 
+impl From<JsonError> for WebSocketError {
+    fn from(value: JsonError) -> Self {
+        Self::Json(value)
+    }
+}
+
 impl Display for WebSocketError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -57,7 +64,8 @@ impl Display for ShardError {
             ShardError::Tungstenite(e) => write!(f, "{e}"),
 
             // TODO: Closed message.
-            _ => unimplemented!(),
+            ShardError::Closed(Some(e)) => write!(f, "Gateway Closed: {}({})", e.code, e.reason),
+            ShardError::Closed(None) => write!(f, "Gateway Closed without reason"),
         }
     }
 }
