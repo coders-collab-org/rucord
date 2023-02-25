@@ -1,7 +1,7 @@
-use std::sync::Arc;
+use std::{str::FromStr, sync::Arc};
 
 use async_trait::async_trait;
-use rucord_api_types::GatewayIntentBits;
+use rucord_api_types::{GatewayDispatchEvents, GatewayIntentBits};
 use rucord_rest::{RequestManager, RequestManagerOptions};
 use rucord_ws::{ShardError, WebSocketEventHandler, WebSocketManager, WebSocketManagerOptions};
 
@@ -32,6 +32,13 @@ pub async fn test() {
     eprintln!("{err}")
 }
 
+#[test]
+fn test_gateway_event_parser() {
+    assert_eq!(
+        GatewayDispatchEvents::from_str("READY"),
+        Ok(GatewayDispatchEvents::Ready)
+    )
+}
 struct RawEventHandler;
 
 #[async_trait]
