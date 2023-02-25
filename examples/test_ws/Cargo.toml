@@ -1,0 +1,14 @@
+[package]
+name = "test_ws"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+rucord_ws = { path = "../../rucord_ws" }
+rucord_rest = { path = "../../rucord_rest" }
+rucord_api_types = { path = "../../rucord_api_types" }
+
+async-trait = "0.1.64"

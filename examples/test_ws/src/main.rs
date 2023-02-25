@@ -9,8 +9,8 @@ pub fn get_token() -> String {
     include_str!("./token.private").into()
 }
 
-#[actix_rt::test]
-pub async fn test() {
+#[tokio::main]
+async fn main() {
     let token = get_token();
 
     let rest = Arc::new(
@@ -46,7 +46,7 @@ impl WebSocketEventHandler for RawEventHandler {
     async fn debug(&self, _: usize, message: String) {
         println!("{message}")
     }
-    async fn shard_error(&self, id: usize, error: ShardError) {
-        eprintln!("[ERROR] [Shard {id}]: {error}");
+    async fn shard_error(&self, id: usize, error: &ShardError) {
+        eprintln!("[ERROR] [SHARD {id}] {error}");
     }
 }
