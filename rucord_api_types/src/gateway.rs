@@ -122,7 +122,7 @@ bitflags! {
 /// feature.
 ///
 /// [Discord documentation](https://discord.com/developers/docs/topics/gateway#commands-and-events-gateway-events).
-#[derive(Debug, Clone, Serialize, Deserialize, EnumString, Display)]
+#[derive(Debug, Clone, Serialize, Deserialize, EnumString, Display, PartialEq, Eq)]
 #[strum(serialize_all = "SCREAMING_SNAKE_CASE")]
 pub enum GatewayDispatchEvents {
     /// Emitted when the application command permissions for a guild have been updated.
