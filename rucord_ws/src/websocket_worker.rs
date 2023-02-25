@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_tungstenite::tungstenite::protocol::CloseFrame;
 use kanal::{AsyncReceiver, AsyncSender};
-use rucord_api_types::{GatewayBotObject, GatewayIntentBits};
+use rucord_api_types::{GatewayBotObject, GatewayIntentBits, IdentifyConnectionProperties};
 use tokio::{spawn, sync::Mutex};
 
 use crate::{ShardId, ShardMessage, WebSocketEventHandler, WebSocketShard};
@@ -11,6 +11,8 @@ pub struct WebSocketWorkerOptions {
     pub gateway_info: Arc<Mutex<GatewayBotObject>>,
 
     pub token: String,
+
+    pub identify_properties: IdentifyConnectionProperties,
 
     pub event_handler: Arc<dyn WebSocketEventHandler>,
 
