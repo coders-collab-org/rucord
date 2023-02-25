@@ -444,32 +444,32 @@ pub enum DispatchPayload {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct IdentifyData {
-    token: String,
+    pub token: String,
 
-    properties: IdentifyConnectionProperties,
-
-    #[serde(default)]
-    compress: Option<bool>,
+    pub properties: IdentifyConnectionProperties,
 
     #[serde(default)]
-    large_threshold: Option<u64>,
+    pub compress: Option<bool>,
 
     #[serde(default)]
-    shard: Option<(u64, u64)>,
+    pub large_threshold: Option<u64>,
 
     #[serde(default)]
-    presence: Option<UpdatePresenceData>,
+    pub shard: Option<(u64, u64)>,
 
-    intents: GatewayIntentBits,
+    #[serde(default)]
+    pub presence: Option<UpdatePresenceData>,
+
+    pub intents: GatewayIntentBits,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IdentifyConnectionProperties {
-    os: String,
+    pub os: String,
 
-    browser: String,
+    pub browser: String,
 
-    device: String,
+    pub device: String,
 }
 
 impl Default for IdentifyConnectionProperties {
@@ -486,30 +486,30 @@ impl Default for IdentifyConnectionProperties {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResumeData {
-    token: String,
+    pub token: String,
 
-    session_id: String,
+    pub session_id: String,
 
-    seq: i64,
+    pub seq: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestGuildMembersData {
-    guild_id: Snowflake,
+    pub guild_id: Snowflake,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    query: Option<String>,
+    pub query: Option<String>,
 
-    limit: u64,
-
-    #[serde(skip_serializing_if = "Option::is_none")]
-    presences: Option<bool>,
+    pub limit: u64,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    user_ids: Option<Vec<Snowflake>>,
+    pub presences: Option<bool>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
-    nonce: Option<String>,
+    pub user_ids: Option<Vec<Snowflake>>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nonce: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -547,22 +547,22 @@ pub enum PresenceStateType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReadyData {
-    v: u8,
+    pub v: u8,
 
-    user: UserObject,
+    pub user: UserObject,
 
     //TODO: When write UnavailableGuildObject.
-    guilds: Vec<Value>,
+    pub guilds: Vec<Value>,
 
-    session_id: String,
+    pub session_id: String,
 
-    resume_gateway_url: String,
+    pub resume_gateway_url: String,
 
     #[serde(default)]
-    shard: Option<(u64, u64)>,
+    pub shard: Option<(u64, u64)>,
 
     //TODO: When write ApplicationObject.
-    application: Value,
+    pub application: Value,
 }
 
 impl Serialize for GatewaySendPayload {
