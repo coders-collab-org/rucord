@@ -8,6 +8,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
 
 jobs:
   build:
