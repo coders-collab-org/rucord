@@ -1,17 +1,13 @@
-use std::sync::Arc;
+use std::{env, sync::Arc};
 
 use async_trait::async_trait;
 use rucord_api_types::GatewayIntentBits;
 use rucord_rest::{RequestManager, RequestManagerOptions};
 use rucord_ws::{ShardError, WebSocketEventHandler, WebSocketManager, WebSocketManagerOptions};
 
-pub fn get_token() -> String {
-    include_str!("./token.private").into()
-}
-
 #[tokio::main]
 async fn main() {
-    let token = get_token();
+    let token = env::var("BOT_TOKEN").expect("expected BOT_TOKEN env.");
 
     let rest = Arc::new(
         RequestManager::new_with_token(RequestManagerOptions::default(), token.clone()).into(),
