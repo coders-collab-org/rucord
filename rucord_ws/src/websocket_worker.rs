@@ -5,7 +5,7 @@ use kanal::{AsyncReceiver, AsyncSender};
 use rucord_api_types::{GatewayBotObject, GatewayIntentBits, IdentifyConnectionProperties};
 use tokio::{spawn, sync::Mutex};
 
-use crate::{ShardId, ShardMessage, WebSocketEventHandler, WebSocketShard};
+use crate::{IdentifyQueue, ShardId, ShardMessage, WebSocketEventHandler, WebSocketShard};
 
 pub struct WebSocketWorkerOptions {
     pub gateway_info: Arc<Mutex<GatewayBotObject>>,
@@ -13,6 +13,8 @@ pub struct WebSocketWorkerOptions {
     pub token: String,
 
     pub identify_properties: IdentifyConnectionProperties,
+
+    pub identify_queue: IdentifyQueue,
 
     pub event_handler: Arc<dyn WebSocketEventHandler>,
 

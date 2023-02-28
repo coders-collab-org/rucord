@@ -1,4 +1,7 @@
-use std::{sync::Arc, time::Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use crate::{
     Result, Session, ShardError, ShardId, WebSocket, WebSocketError, WebSocketEventHandler,
@@ -49,7 +52,7 @@ pub struct WebSocketShard {
 
     heartbeat_interval: i64,
 
-    next_heartbeat: i64,
+    next_heartbeat: Duration,
 
     is_ack: bool,
 }
@@ -72,7 +75,7 @@ impl WebSocketShard {
             started_at: Instant::now(),
             last_heartbeat: Instant::now(),
             heartbeat_interval: -1,
-            next_heartbeat: -1,
+            next_heartbeat: Duration::default(),
             session: None,
             is_ack: true,
         }
@@ -164,7 +167,7 @@ impl WebSocketShard {
                         return Ok(());
                     }
                 },
-                Err(e) if e == true => return Ok(()),
+                Err(e) if e => return Ok(()),
                 _ => (),
             }
 
@@ -186,11 +189,9 @@ impl WebSocketShard {
     }
 
     pub async fn heartbeat(&mut self, requested: bool) -> Result<()> {
-        if !requested && self.last_heartbeat.elapsed().as_millis() <= self.next_heartbeat as u128 {
+        if !requested && self.last_heartbeat.elapsed() <= self.next_heartbeat {
             return Ok(());
         }
-
-        println!("heartbeat: {}", self.next_heartbeat as u128);
 
         self.send(GatewaySendPayload::Heartbeat(
             self.session.as_ref().map(|s| s.sequence),
@@ -199,8 +200,9 @@ impl WebSocketShard {
 
         self.last_heartbeat = Instant::now();
 
-        self.next_heartbeat =
-            (self.heartbeat_interval as f64 * rand::thread_rng().gen::<f64>()) as i64;
+        self.next_heartbeat = Duration::from_millis(
+            (self.heartbeat_interval as f64 * rand::thread_rng().gen::<f64>()) as u64,
+        );
 
         self.is_ack = false;
 
@@ -217,9 +219,9 @@ impl WebSocketShard {
 
                 self.heartbeat_interval = heartbeat_interval as i64;
 
-                self.next_heartbeat =
-                    (self.heartbeat_interval as f64 * rand::thread_rng().gen::<f64>()) as i64;
-
+                self.next_heartbeat = Duration::from_millis(
+                    (self.heartbeat_interval as f64 * rand::thread_rng().gen::<f64>()) as u64,
+                );
                 self.last_heartbeat = Instant::now();
 
                 self.identify().await?;
@@ -283,11 +285,14 @@ impl WebSocketShard {
             identify_properties,
             intents,
             gateway_info,
+            identify_queue,
             ..
         } = self.options.as_ref();
 
+        identify_queue.wait_for_identify().await;
+
         self.debug(&[
-            format!("Identifying"),
+            "Identifying".to_string(),
             format!("shard id: {}", self.id),
             format!("intents: {}", intents.bits()),
         ])

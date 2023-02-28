@@ -1,4 +1,7 @@
-use std::{sync::Arc, time::Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use async_tungstenite::tungstenite::protocol::CloseFrame;
 use futures::future::join_all;
@@ -6,7 +9,10 @@ use rucord_api_types::{GatewayBotObject, GatewayIntentBits, SessionStartLimitObj
 use rucord_rest::RequestManager;
 use tokio::sync::Mutex;
 
-use crate::{Result, ShardBucket, WebSocketError, WebSocketEventHandler, WebSocketWorkerOptions};
+use crate::{
+    IdentifyQueue, Result, ShardBucket, WebSocketError, WebSocketEventHandler,
+    WebSocketWorkerOptions,
+};
 
 pub type ShardId = usize;
 
@@ -104,7 +110,7 @@ impl WebSocketManager {
             shards,
             session_start_limit: SessionStartLimitObject { remaining, .. },
             ..
-        } = self.fetch_gateway_info().await?.lock().await.clone();
+        } = *self.fetch_gateway_info().await?.lock().await;
 
         if shards > remaining {
             Err(WebSocketError::NotEnoughSessionsRemaining(
@@ -119,7 +125,9 @@ impl WebSocketManager {
             bucket.connect().await;
         }
 
-        loop {}
+        loop {
+            tokio::time::sleep(Duration::from_secs(10)).await;
+        }
     }
 
     pub async fn destroy(&self, info: Option<CloseFrame<'static>>) {
@@ -140,11 +148,12 @@ impl WebSocketManager {
             .max_concurrency;
 
         let options = Arc::new(WebSocketWorkerOptions {
+            identify_queue: IdentifyQueue::new(gateway_info.clone()),
             gateway_info,
             event_handler,
             token: token.clone(),
             identify_properties: Default::default(),
-            intents: intents.clone(),
+            intents: *intents,
         });
         self.buckets = join_all(
             self.shard_ids
