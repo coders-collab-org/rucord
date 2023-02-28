@@ -637,7 +637,7 @@ impl DispatchPayload {
         let event_str: String = to_value!(payload, t);
 
         let Ok(event) = GatewayDispatchEvents::from_str(&event_str) else {
-            return (s, Self::Unknown(event_str.into(), payload));
+            return (s, Self::Unknown(event_str, payload));
         };
 
         (

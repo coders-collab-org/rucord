@@ -9,10 +9,8 @@ impl<'de> Deserialize<'de> for UserFlags {
     {
         let flags = u64::deserialize(deserializer)?;
 
-        UserFlags::from_bits(flags).ok_or(serde::de::Error::custom(format!(
-            "Unexpected flags value {}",
-            flags
-        )))
+        UserFlags::from_bits(flags)
+            .ok_or_else(|| serde::de::Error::custom(format!("Unexpected flags value {}", flags)))
     }
 }
 
