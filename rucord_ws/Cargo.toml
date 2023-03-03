@@ -25,6 +25,7 @@ rand = "0.8.5"
 
 rucord_api_types = { path = "../rucord_api_types" }
 rucord_rest = { path = "../rucord_rest" }
+derive_more = "0.99.17"
 
 [dev-dependencies]
 actix-rt = "*"

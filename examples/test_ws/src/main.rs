@@ -3,10 +3,12 @@ use std::{env, sync::Arc};
 use async_trait::async_trait;
 use rucord_api_types::GatewayIntentBits;
 use rucord_rest::{RequestManager, RequestManagerOptions};
-use rucord_ws::{ShardError, WebSocketEventHandler, WebSocketManager, WebSocketManagerOptions};
+use rucord_ws::{
+    Result, ShardError, WebSocketEventHandler, WebSocketManager, WebSocketManagerOptions,
+};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     let token = env::var("BOT_TOKEN").expect("expected BOT_TOKEN env.");
 
     let rest = Arc::new(
@@ -21,11 +23,9 @@ async fn main() {
         rest,
     });
 
-    let Err(err) = ws.connect(RawEventHandler).await else {
-        return;
-    };
+    ws.connect(RawEventHandler).await?;
 
-    eprintln!("{err}")
+    Ok(())
 }
 
 struct RawEventHandler;

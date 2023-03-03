@@ -108,25 +108,34 @@ impl WebSocketShard {
             println!("{err}");
         }
     }
+
     pub async fn connect(&mut self) -> Result<()> {
         if self.status != WebSocketShardStatus::Idle {
             Err(ShardError::NotIdle)?;
         }
 
-        let started_at = Instant::now();
+        self.started_at = Instant::now();
 
         self.debug(&["Started WebSocket connection."]).await;
 
+        self.status = WebSocketShardStatus::Connecting;
+
         let connection = WebSocket::create(&self.options.gateway_info.lock().await.url).await?;
 
-        let take = started_at.elapsed().as_millis();
-
-        self.debug(&[format!("WebSocket connection established after {take} ms.")])
-            .await;
-
-        self.started_at = started_at;
+        self.debug(&[format!(
+            "WebSocket connection established after {:?}",
+            self.started_at
+        )])
+        .await;
 
         self.connection = Some(connection);
+
+        loop {
+            if let Some(GatewayReceivePayload::Hello(_)) = self.wait_event().await? {
+                self.identify().await?;
+                break;
+            }
+        }
 
         Ok(())
     }
@@ -154,7 +163,8 @@ impl WebSocketShard {
                         };
                         continue;
                      };
-                        self.resolve_ws_error(err).await?;
+                        self.resolve_ws_error(&err).await?;
+                        return Err(err);
                     }
 
                     WorkerMessage::Destroy(info) => {
@@ -173,21 +183,30 @@ impl WebSocketShard {
 
             if self.connection.is_some() && self.heartbeat_interval != -1 {
                 if let Err(e) = self.heartbeat(false).await {
-                    self.resolve_ws_error(e).await?;
+                    self.resolve_ws_error(&e).await?;
+                    return Err(e);
                 };
             }
 
-            let Some(ref mut connection) = self.connection else { continue; };
-
-            match connection.recv_next().await {
-                Ok(Some(e)) => self.resolve_ws_event(e).await?,
-                Ok(None) => continue,
-
-                Err(err) => self.resolve_ws_error(err).await?,
-            };
+            self.wait_event().await?;
         }
     }
+    pub async fn wait_event(&mut self) -> Result<Option<GatewayReceivePayload>> {
+        let Some(ref mut connection) = self.connection else { return Ok(None); };
 
+        match connection.recv_next().await {
+            Ok(Some(e)) => {
+                self.resolve_event(&e).await?;
+                Ok(Some(e))
+            }
+            Ok(None) => Ok(None),
+
+            Err(err) => {
+                self.resolve_ws_error(&err).await?;
+                Err(err)
+            }
+        }
+    }
     pub async fn heartbeat(&mut self, requested: bool) -> Result<()> {
         if !requested && self.last_heartbeat.elapsed() <= self.next_heartbeat {
             return Ok(());
@@ -209,7 +228,7 @@ impl WebSocketShard {
         Ok(())
     }
     // TODO: Resolve ws event.
-    pub async fn resolve_ws_event(&mut self, event: GatewayReceivePayload) -> Result<()> {
+    pub async fn resolve_event(&mut self, event: &GatewayReceivePayload) -> Result<()> {
         match event {
             GatewayReceivePayload::Hello(heartbeat_interval) => {
                 self.debug(&[format!(
@@ -217,14 +236,11 @@ impl WebSocketShard {
                 )])
                 .await;
 
-                self.heartbeat_interval = heartbeat_interval as i64;
+                self.heartbeat_interval = *heartbeat_interval as i64;
 
                 self.next_heartbeat = Duration::from_millis(
                     (self.heartbeat_interval as f64 * rand::thread_rng().gen::<f64>()) as u64,
                 );
-                self.last_heartbeat = Instant::now();
-
-                self.identify().await?;
             }
 
             GatewayReceivePayload::HeartbeatRequest => self.heartbeat(true).await?,
@@ -232,27 +248,23 @@ impl WebSocketShard {
             GatewayReceivePayload::HeartbeatAck => {
                 self.is_ack = true;
 
-                let latency = self.last_heartbeat.elapsed();
-
                 self.debug(&[format!(
-                    "The latency since the last heartbeat is: {}ms.",
-                    latency.as_millis()
+                    "The latency since the last heartbeat is: {:?}",
+                    self.last_heartbeat.elapsed()
                 )])
                 .await;
             }
 
             a => {
                 println!("event unimplemented yet {a:#?}");
-
-                return Ok(());
             }
         }
         Ok(())
     }
 
     // TODO: Resolve error.
-    pub async fn resolve_ws_error(&mut self, error: WebSocketError) -> Result<()> {
-        self.error(&error).await;
+    pub async fn resolve_ws_error(&mut self, error: &WebSocketError) -> Result<()> {
+        self.error(error).await;
         // match error {
         //     WebSocketError::Request(_) => todo!(),
         //     WebSocketError::Shard(_) => todo!(),
@@ -260,8 +272,9 @@ impl WebSocketShard {
         //     WebSocketError::Json(_) => todo!(),
         // }
 
-        Err(error)
+        Ok(())
     }
+
     pub async fn wait_worker_event(
         &mut self,
     ) -> core::result::Result<WorkerMessage, /*need_to_stop: */ bool> {

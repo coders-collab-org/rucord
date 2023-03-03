@@ -1,74 +1,32 @@
 use async_tungstenite::tungstenite::{protocol::CloseFrame, Error as TungsteniteError};
+use derive_more::{Display, Error, From};
 use rucord_rest::reqwest::Error as RegError;
 use serde_json::Error as JsonError;
-use std::{error::Error, fmt::Display};
 
-#[derive(Debug)]
+#[derive(Debug, From, Error, Display)]
 pub enum WebSocketError {
+    #[display(fmt = "{_0}")]
     Request(RegError),
+    #[display(fmt = "{_0}")]
     Shard(ShardError),
+    #[display(fmt = "There are only {_0} sessions available, \
+        which is not enough to spawn {_1} shards.")]
     NotEnoughSessionsRemaining(u64, u64),
+    #[display(fmt = "{_0}")]
     Json(JsonError),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error, From, Display)]
 pub enum ShardError {
+    #[display(fmt = "attempting to establish a connection with a non-idle shard")]
     NotIdle,
+    #[display(fmt = "{_0}")]
     Tungstenite(TungsteniteError),
-    Closed(Option<CloseFrame<'static>>),
+    #[display(
+        fmt = "{}",
+        "_0.as_ref()
+        .map_or_else(|| \"Gateway Closed without reason\".into(),
+        |e| format!(\"Gateway Closed: {}({})\", e.code, e.reason))"
+    )]
+    Closed(#[error(not(source))] Option<CloseFrame<'static>>),
 }
-
-impl From<RegError> for WebSocketError {
-    fn from(value: RegError) -> Self {
-        Self::Request(value)
-    }
-}
-
-impl From<ShardError> for WebSocketError {
-    fn from(value: ShardError) -> Self {
-        Self::Shard(value)
-    }
-}
-
-impl From<TungsteniteError> for ShardError {
-    fn from(value: TungsteniteError) -> Self {
-        Self::Tungstenite(value)
-    }
-}
-
-impl From<JsonError> for WebSocketError {
-    fn from(value: JsonError) -> Self {
-        Self::Json(value)
-    }
-}
-
-impl Display for WebSocketError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WebSocketError::Request(e) => write!(f, "{e}"),
-            WebSocketError::Shard(e) => write!(f, "{e}"),
-            WebSocketError::NotEnoughSessionsRemaining(remaining, shard_count) => write!(f, "There are only {remaining} sessions available, which is not enough to spawn {shard_count} shards."),
-            WebSocketError::Json(e) => write!(f, "{e}")
-
-        }
-    }
-}
-
-impl Display for ShardError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ShardError::NotIdle => write!(
-                f,
-                "Attempting to establish a connection with a non-idle shard"
-            ),
-            ShardError::Tungstenite(e) => write!(f, "{e}"),
-
-            // TODO: Closed message.
-            ShardError::Closed(Some(e)) => write!(f, "Gateway Closed: {}({})", e.code, e.reason),
-            ShardError::Closed(None) => write!(f, "Gateway Closed without reason"),
-        }
-    }
-}
-
-impl Error for WebSocketError {}
-impl Error for ShardError {}
