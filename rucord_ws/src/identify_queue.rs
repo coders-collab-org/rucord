@@ -1,10 +1,9 @@
 use rucord_api_types::GatewayBotObject;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::{Mutex, Semaphore};
+use tokio::sync::Mutex;
 
 pub struct IdentifyQueue {
-    send_rate_limit: Semaphore,
     identify_state: Mutex<IdentifyState>,
     gateway_info: Arc<Mutex<GatewayBotObject>>,
 }
@@ -19,41 +18,34 @@ impl IdentifyQueue {
 
     pub fn new(gateway_info: Arc<Mutex<GatewayBotObject>>) -> Self {
         IdentifyQueue {
-            send_rate_limit: Semaphore::new(1),
             identify_state: Mutex::new(IdentifyState {
                 remaining: 0,
-                reset_time: Instant::now() - Self::FIVE_SECOND,
+                reset_time: Instant::now().checked_sub(Self::FIVE_SECOND).unwrap(),
             }),
             gateway_info,
         }
     }
 
     pub async fn wait_for_identify(&self) {
-        let permit = self.send_rate_limit.acquire().await.unwrap();
+        let mut identify_state = self.identify_state.lock().await;
 
-        {
-            let mut lock = self.identify_state.lock().await;
+        if identify_state.remaining == 0 {
+            let elapsed_since_reset = identify_state.reset_time.elapsed();
 
-            if lock.remaining == 0 {
-                let elapsed_since_reset = lock.reset_time.elapsed();
-
-                if elapsed_since_reset < Self::FIVE_SECOND {
-                    tokio::time::sleep(Self::FIVE_SECOND - elapsed_since_reset).await;
-                }
-
-                lock.remaining = self
-                    .gateway_info
-                    .lock()
-                    .await
-                    .session_start_limit
-                    .max_concurrency;
-
-                lock.reset_time = Instant::now();
+            if elapsed_since_reset < Self::FIVE_SECOND {
+                tokio::time::sleep(Self::FIVE_SECOND - elapsed_since_reset).await;
             }
 
-            lock.remaining -= 1;
+            identify_state.remaining = self
+                .gateway_info
+                .lock()
+                .await
+                .session_start_limit
+                .max_concurrency;
+
+            identify_state.reset_time = Instant::now();
         }
 
-        permit.forget();
+        identify_state.remaining -= 1;
     }
 }
