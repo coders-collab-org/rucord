@@ -207,7 +207,7 @@ impl WebSocketShard {
                     WorkerMessage::Connect => {
                         let Err(err) = self.connect().await else {
 
-                        if let Err(_) = self.sender.send(ShardMessage::Connected).await {
+                        if self.sender.send(ShardMessage::Connected).await.is_err() {
                             return Ok(());
                         };
                         continue;
@@ -219,7 +219,7 @@ impl WebSocketShard {
                     WorkerMessage::Destroy(info) => {
                         self.destroy(info, None).await?;
 
-                        if let Err(_) = self.sender.send(ShardMessage::Destroyed).await {
+                        if self.sender.send(ShardMessage::Destroyed).await.is_err() {
                             return Ok(());
                         };
 
@@ -392,11 +392,10 @@ impl WebSocketShard {
 
     pub async fn resolve_ws_error(&mut self, error: &WebSocketError) -> Result<()> {
         self.error(error).await;
-        match error {
+
+        if let WebSocketError::Shard(_) = error {
             // TODO: Resolve close error.
-            WebSocketError::Shard(_) => (),
-            _ => (),
-        }
+        };
 
         Ok(())
     }
