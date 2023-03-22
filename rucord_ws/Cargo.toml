@@ -6,26 +6,28 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+serde.workspace = true
+bitflags.workspace = true
+tokio.workspace = true
+serde_json.workspace = true
+num-traits.workspace = true
+num-derive.workspace = true
+async-trait.workspace = true
+derive_more.workspace = true
+
 async-tungstenite = { version = "0.20.0", features = [
     "tokio-runtime",
     "tokio-native-tls",
 ] }
-async-trait = "0.1.64"
-tokio = { version = "1", features = ["sync", "time"] }
-bitflags = "1.3.2"
+futures = { version = "0.3.26", default-features = false, features = ["std"] }
 strum = "0.24.1"
 strum_macros = "0.24.3"
-serde = { version = "1.0.152", features = ["derive"] }
-serde_json = "1.0.93"
-num-derive = "0.3.3"
-num-traits = "0.2"
 kanal = "0.1.0-pre8"
-futures = { version = "0.3.26", default-features = false, features = ["std"] }
 rand = "0.8.5"
 
 rucord_api_types = { path = "../rucord_api_types" }
 rucord_rest = { path = "../rucord_rest" }
-derive_more = "0.99.17"
+async-recursion = "1.0.2"
 
 [dev-dependencies]
 actix-rt = "*"
