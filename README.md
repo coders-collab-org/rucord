@@ -17,13 +17,18 @@ We also have a [code of conduct](CODE_OF_CONDUCT.md) that we expect all contribu
 ## Roadmap
 
 ### WebSocket Manager
+
 - [x] Implement worker and shard creation.
 - [x] Implement shard bucket creation.
 - [x] Resolve hello event and implement heartbeat interval.
 - [x] Implement identify message sending.
 - [x] Apply identify rate limit = 5 second.
-- [ ] resolve all gateway operations.
-- [ ] resolve all gateway dispatch events.
+- [x] Resolve all gateway operations.
+- [ ] Resolve ws close event.
+
+### Client Structure
+
+- [ ] Implement Client Structure.
 
 ## Blazingly Fast 🚀
 
