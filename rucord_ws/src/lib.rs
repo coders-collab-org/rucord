@@ -18,4 +18,6 @@ pub use websocket_manager::*;
 pub use websocket_shard::*;
 pub use websocket_worker::*;
 
+pub use rucord_api_types as api_types;
+
 pub type Result<T> = core::result::Result<T, WebSocketError>;
