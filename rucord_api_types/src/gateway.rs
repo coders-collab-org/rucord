@@ -2,15 +2,15 @@
 
 use std::{env, str::FromStr};
 
+use crate::{Snowflake, UnavailableGuildObject, UserObject};
 use bitflags::bitflags;
+use derive_more::From;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use serde::{ser::SerializeStruct, Deserialize, Serialize};
 use serde_json::{from_value, Value};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use strum_macros::{Display, EnumString};
-
-use crate::{Snowflake, UserObject};
 
 type JsonMap = serde_json::Map<String, Value>;
 
@@ -283,7 +283,7 @@ pub enum GatewayDispatchEvents {
     GuildAuditLogEntryCreate,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, From)]
 pub enum GatewaySendPayload {
     Identify(IdentifyData),
     Resume(ResumeData),
@@ -311,7 +311,7 @@ pub enum GatewayReceivePayload {
     Reconnect,
 
     /// [Discord documentation](https://discord.com/developers/docs/topics/gateway#reconnect).
-    Dispatch((i64, DispatchPayload)),
+    Dispatch((u64, DispatchPayload)),
 
     UnknownOp(u64, JsonMap),
 }
@@ -398,6 +398,8 @@ pub enum DispatchPayload {
     GuildScheduledEventUserRemove(JsonMap),
 
     InteractionCreate(JsonMap),
+
+    IntegrationCreate(JsonMap),
 
     IntegrationUpdate(JsonMap),
 
@@ -492,7 +494,7 @@ pub struct ResumeData {
 
     pub session_id: String,
 
-    pub seq: i64,
+    pub seq: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -553,8 +555,7 @@ pub struct ReadyData {
 
     pub user: UserObject,
 
-    //TODO: When write UnavailableGuildObject.
-    pub guilds: Vec<Value>,
+    pub guilds: Vec<UnavailableGuildObject>,
 
     pub session_id: String,
 
@@ -631,7 +632,7 @@ impl GatewayReceivePayload {
 }
 
 impl DispatchPayload {
-    pub fn from_payload(mut payload: JsonMap) -> (i64, Self) {
+    pub fn from_payload(mut payload: JsonMap) -> (u64, Self) {
         let s = to_value!(payload, s);
 
         let event_str: String = to_value!(payload, t);
@@ -640,13 +641,78 @@ impl DispatchPayload {
             return (s, Self::Unknown(event_str, payload));
         };
 
+        macro_rules! event_arms {
+            ($($Name:ident),+ $(,)?) => {
+                match event {
+                    GatewayDispatchEvents::Ready => Self::Ready(to_value!(payload, d)),
+                    GatewayDispatchEvents::Resumed => Self::Resume,
+                    $(GatewayDispatchEvents::$Name => Self::$Name(to_value!(payload, d)),)+
+                }
+            }
+        }
+
         (
             s,
-            match event {
-                GatewayDispatchEvents::Ready => Self::Ready(to_value!(payload, d)),
-                GatewayDispatchEvents::Resumed => Self::Resume,
-
-                _ => unimplemented!(),
+            event_arms! {
+                ApplicationCommandPermissionsUpdate,
+                ChannelCreate,
+                ChannelDelete,
+                ChannelPinsUpdate,
+                ChannelUpdate,
+                GuildBanAdd,
+                GuildBanRemove,
+                GuildCreate,
+                GuildDelete,
+                GuildEmojisUpdate,
+                GuildIntegrationsUpdate,
+                GuildMemberAdd,
+                GuildMemberRemove,
+                GuildMembersChunk,
+                GuildMemberUpdate,
+                GuildRoleCreate,
+                GuildRoleDelete,
+                GuildRoleUpdate,
+                GuildStickersUpdate,
+                GuildUpdate,
+                IntegrationCreate,
+                IntegrationDelete,
+                IntegrationUpdate,
+                InteractionCreate,
+                InviteCreate,
+                InviteDelete,
+                MessageCreate,
+                MessageDelete,
+                MessageDeleteBulk,
+                MessageReactionAdd,
+                MessageReactionRemove,
+                MessageReactionRemoveAll,
+                MessageReactionRemoveEmoji,
+                MessageUpdate,
+                PresenceUpdate,
+                StageInstanceCreate,
+                StageInstanceDelete,
+                StageInstanceUpdate,
+                ThreadCreate,
+                ThreadDelete,
+                ThreadListSync,
+                ThreadMemberUpdate,
+                ThreadMembersUpdate,
+                ThreadUpdate,
+                TypingStart,
+                UserUpdate,
+                VoiceServerUpdate,
+                VoiceStateUpdate,
+                WebhooksUpdate,
+                GuildScheduledEventCreate,
+                GuildScheduledEventUpdate,
+                GuildScheduledEventDelete,
+                GuildScheduledEventUserAdd,
+                GuildScheduledEventUserRemove,
+                AutoModerationRuleCreate,
+                AutoModerationRuleUpdate,
+                AutoModerationRuleDelete,
+                AutoModerationActionExecution,
+                GuildAuditLogEntryCreate,
             },
         )
     }
