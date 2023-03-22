@@ -7,7 +7,7 @@ use async_tungstenite::{
     WebSocketStream,
 };
 use futures::{SinkExt, StreamExt};
-use rucord_api_types::{GatewayReceivePayload, GatewaySendPayload};
+use rucord_api_types::{DispatchPayload, GatewayReceivePayload, GatewaySendPayload, ReadyData};
 use serde_json::to_string;
 use tokio::time::timeout;
 
@@ -61,9 +61,11 @@ fn get_text(msg: Message) -> Result<Option<String>> {
     }
 }
 
-// TODO: Use debug method in the code.
 #[async_trait]
 pub trait WebSocketEventHandler: Send + Sync {
     async fn debug(&self, _shard_id: ShardId, _message: String) {}
     async fn shard_error(&self, _shard_id: ShardId, _error: &ShardError) {}
+    async fn dispatch(&self, _shard_id: ShardId, _data: &DispatchPayload) {}
+    async fn ready(&self, _shard_id: ShardId, _data: &ReadyData) {}
+    async fn resumed(&self, _shard_id: ShardId) {}
 }
