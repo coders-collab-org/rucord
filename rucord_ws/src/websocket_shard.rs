@@ -7,10 +7,13 @@ use crate::{
     Result, Session, ShardError, ShardId, WebSocket, WebSocketError, WebSocketEventHandler,
     WebSocketExt, WebSocketWorkerOptions, WorkerMessage,
 };
+use async_recursion::async_recursion;
 use async_tungstenite::tungstenite::protocol::CloseFrame;
 use kanal::{AsyncReceiver, AsyncSender};
 use rand::Rng;
-use rucord_api_types::{GatewayReceivePayload, GatewaySendPayload, IdentifyData};
+use rucord_api_types::{
+    DispatchPayload, GatewayReceivePayload, GatewaySendPayload, IdentifyData, ResumeData,
+};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum WebSocketShardStatus {
@@ -89,14 +92,12 @@ impl WebSocketShard {
     }
 
     #[inline]
-    pub async fn debug(&self, msg: &[impl AsRef<str>]) {
-        let msg = msg
-            .iter()
-            .map(|s| s.as_ref().to_string())
-            .collect::<Vec<String>>()
-            .join("\n");
+    pub async fn debug(&self, msg: &[&str]) {
         self.event_handler
-            .debug(self.id, format!("[DEBUG] [SHARD {}]: {}", self.id, msg))
+            .debug(
+                self.id,
+                format!("[DEBUG] [SHARD {}]: {}", self.id, msg.to_owned().join("\n")),
+            )
             .await;
     }
 
@@ -109,6 +110,7 @@ impl WebSocketShard {
         }
     }
 
+    #[async_recursion]
     pub async fn connect(&mut self) -> Result<()> {
         if self.status != WebSocketShardStatus::Idle {
             Err(ShardError::NotIdle)?;
@@ -122,9 +124,9 @@ impl WebSocketShard {
 
         let connection = WebSocket::create(&self.options.gateway_info.lock().await.url).await?;
 
-        self.debug(&[format!(
+        self.debug(&[&format!(
             "WebSocket connection established after {:?}",
-            self.started_at
+            self.started_at.elapsed()
         )])
         .await;
 
@@ -140,25 +142,72 @@ impl WebSocketShard {
         Ok(())
     }
 
-    pub async fn destroy(&mut self, info: Option<CloseFrame<'static>>) {
+    pub async fn destroy(
+        &mut self,
+        info: Option<CloseFrame<'static>>,
+        recover: Option<bool>,
+    ) -> Result<()> {
         if self.status == WebSocketShardStatus::Idle {
-            return;
+            self.debug(&["Tried to destroy an idle shard"]).await;
+            return Ok(());
         }
 
-        let Some(ref mut connection) = self.connection else { return; };
+        self.debug(&[
+            "Attempting to destroy the shard with the following information",
+            &format!(
+                "Reason: {}",
+                info.as_ref()
+                    .map_or_else(|| "none".to_owned(), |i| i.reason.to_string())
+            ),
+            &format!(
+                "Code: {}",
+                info.as_ref()
+                    .map_or_else(|| "none".to_owned(), |i| i.code.to_string())
+            ),
+            &format!(
+                "Recover: {}",
+                recover.map_or_else(
+                    || "none",
+                    |resume| if resume { "resume" } else { "reconnect" }
+                )
+            ),
+        ])
+        .await;
 
-        if connection.close(info).await.is_err() {}
+        let Some(ref mut connection) = self.connection else { return Ok(()); };
+
+        connection
+            .close(info)
+            .await
+            .map_err(ShardError::Tungstenite)?;
+
+        if matches!(recover, Some(resume) if !resume) && self.session.is_some() {
+            self.session = None;
+        };
+
+        self.is_ack = true;
+
+        self.heartbeat_interval = -1;
+
+        self.connection = None;
+
+        self.status = WebSocketShardStatus::Idle;
+
+        if recover.is_some() {
+            self.connect().await?;
+        }
+
+        Ok(())
     }
 
     pub async fn event_loop(&mut self) -> Result<()> {
         loop {
-            // TODO: Resolve errors.
             match self.wait_worker_event().await {
                 Ok(e) => match e {
                     WorkerMessage::Connect => {
                         let Err(err) = self.connect().await else {
 
-                        if self.sender.send(ShardMessage::Connected).await.is_err() {
+                        if let Err(_) = self.sender.send(ShardMessage::Connected).await {
                             return Ok(());
                         };
                         continue;
@@ -168,9 +217,9 @@ impl WebSocketShard {
                     }
 
                     WorkerMessage::Destroy(info) => {
-                        self.destroy(info).await;
+                        self.destroy(info, None).await?;
 
-                        if self.sender.send(ShardMessage::Destroyed).await.is_err() {
+                        if let Err(_) = self.sender.send(ShardMessage::Destroyed).await {
                             return Ok(());
                         };
 
@@ -191,6 +240,8 @@ impl WebSocketShard {
             self.wait_event().await?;
         }
     }
+
+    #[inline]
     pub async fn wait_event(&mut self) -> Result<Option<GatewayReceivePayload>> {
         let Some(ref mut connection) = self.connection else { return Ok(None); };
 
@@ -207,6 +258,7 @@ impl WebSocketShard {
             }
         }
     }
+
     pub async fn heartbeat(&mut self, requested: bool) -> Result<()> {
         if !requested && self.last_heartbeat.elapsed() <= self.next_heartbeat {
             return Ok(());
@@ -219,19 +271,19 @@ impl WebSocketShard {
 
         self.last_heartbeat = Instant::now();
 
-        self.next_heartbeat = Duration::from_millis(
-            (self.heartbeat_interval as f64 * rand::thread_rng().gen::<f64>()) as u64,
-        );
+        if self.next_heartbeat.as_millis() != self.heartbeat_interval as u128 {
+            self.next_heartbeat = Duration::from_millis(self.heartbeat_interval as u64);
+        }
 
         self.is_ack = false;
 
         Ok(())
     }
-    // TODO: Resolve ws event.
+
     pub async fn resolve_event(&mut self, event: &GatewayReceivePayload) -> Result<()> {
         match event {
             GatewayReceivePayload::Hello(heartbeat_interval) => {
-                self.debug(&[format!(
+                self.debug(&[&format!(
                     "Initiating a regular heartbeat at an interval of {heartbeat_interval} ms."
                 )])
                 .await;
@@ -248,29 +300,103 @@ impl WebSocketShard {
             GatewayReceivePayload::HeartbeatAck => {
                 self.is_ack = true;
 
-                self.debug(&[format!(
+                self.debug(&[&format!(
                     "The latency since the last heartbeat is: {:?}",
                     self.last_heartbeat.elapsed()
                 )])
                 .await;
             }
+            GatewayReceivePayload::InvalidSession(can_resume) => {
+                self.debug(&[&format!(
+                    "Invalid session; will {} to establish a new session",
+                    if *can_resume { "resume" } else { "reconnect" }
+                )])
+                .await;
 
-            a => {
-                println!("event unimplemented yet {a:#?}");
+                if *can_resume && self.session.is_some() {
+                    self.resume().await?;
+                } else {
+                    self.destroy(None, Some(false)).await?;
+                }
+            }
+            GatewayReceivePayload::Reconnect => self.destroy(None, Some(true)).await?,
+            GatewayReceivePayload::Dispatch((s, payload)) => {
+                match payload {
+                    DispatchPayload::Ready(data) => {
+                        self.event_handler.ready(self.id, data).await;
+
+                        if self.session.is_none() {
+                            self.session = Some(Session {
+                                id: data.session_id.clone(),
+                                resume_url: data.resume_gateway_url.clone(),
+                                sequence: *s,
+                                shard_count: self.options.gateway_info.lock().await.shards,
+                                shard_id: self.id,
+                            });
+                        }
+                    }
+
+                    DispatchPayload::Resume => {
+                        self.status = WebSocketShardStatus::Ready;
+                        self.event_handler.resumed(self.id).await;
+                        self.debug(&["Resumed"]).await;
+                    }
+
+                    _ => (),
+                }
+
+                if let Some(session) = &mut self.session {
+                    if *s > session.sequence {
+                        session.sequence = *s;
+                    }
+                };
+
+                self.event_handler.dispatch(self.id, payload).await;
+            }
+            // TODO: Impl unknown_op function.
+            GatewayReceivePayload::UnknownOp(op, _) => {
+                self.debug(&[&format!("unknown op: {op}")]).await
             }
         }
         Ok(())
     }
 
-    // TODO: Resolve error.
+    pub async fn resume(&mut self) -> Result<()> {
+        self.debug(&["Resuming session"]).await;
+
+        let (Some(connection), Some(Session {
+            sequence,
+            id,
+            ..
+        })) = (&mut self.connection, &self.session) else {
+            self.debug(&["There is a resume without connection or session, Please open an issue for this problem on github."]).await;
+
+            return self.connect().await;
+        };
+
+        self.status = WebSocketShardStatus::Resuming;
+
+        connection
+            .send_op(
+                ResumeData {
+                    seq: *sequence,
+                    session_id: id.clone(),
+                    token: self.options.token.clone(),
+                }
+                .into(),
+            )
+            .await?;
+
+        Ok(())
+    }
+
     pub async fn resolve_ws_error(&mut self, error: &WebSocketError) -> Result<()> {
         self.error(error).await;
-        // match error {
-        //     WebSocketError::Request(_) => todo!(),
-        //     WebSocketError::Shard(_) => todo!(),
-        //     WebSocketError::NotEnoughSessionsRemaining(_, _) => todo!(),
-        //     WebSocketError::Json(_) => todo!(),
-        // }
+        match error {
+            // TODO: Resolve close error.
+            WebSocketError::Shard(_) => (),
+            _ => (),
+        }
 
         Ok(())
     }
@@ -279,16 +405,15 @@ impl WebSocketShard {
         &mut self,
     ) -> core::result::Result<WorkerMessage, /*need_to_stop: */ bool> {
         if self.connection.is_some() {
-            match self.receiver.try_recv() {
+            return match self.receiver.try_recv() {
                 Ok(Some(e)) => Ok(e),
                 Ok(None) => Err(false),
                 _ => Err(true),
-            }
-        } else {
-            match self.receiver.recv().await {
-                Ok(e) => Ok(e),
-                _ => Err(true),
-            }
+            };
+        }
+        match self.receiver.recv().await {
+            Ok(e) => Ok(e),
+            _ => Err(true),
         }
     }
 
@@ -305,9 +430,9 @@ impl WebSocketShard {
         identify_queue.wait_for_identify().await;
 
         self.debug(&[
-            "Identifying".to_string(),
-            format!("shard id: {}", self.id),
-            format!("intents: {}", intents.bits()),
+            "Identifying",
+            &format!("shard id: {}", self.id),
+            &format!("intents: {}", intents.bits()),
         ])
         .await;
 
@@ -321,7 +446,7 @@ impl WebSocketShard {
             ..Default::default()
         };
 
-        self.send(GatewaySendPayload::Identify(data)).await
+        self.send(data.into()).await
     }
 
     pub async fn send(&mut self, op: GatewaySendPayload) -> Result<()> {
